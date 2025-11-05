@@ -354,7 +354,10 @@ export default function Orders() {
                       </p>
                       {item.isPersonalized && (
                         <p className="text-sm font-medium truncate">
-                          Personalized Name: {item.personalizedName}
+                          Personalized Name:{" "}
+                          <span className="text-amber-500 text-underline">
+                            {item.personalizedName}
+                          </span>
                         </p>
                       )}
                       <p className="text-sm font-medium truncate">

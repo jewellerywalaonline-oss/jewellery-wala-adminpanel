@@ -1,12 +1,10 @@
 "use client";
 
-import { cache, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { StatCard } from "@/components/stat-card";
 import { RecentActivity } from "@/components/recent-activity";
 import { RecentOrders } from "@/components/recent-orders";
-import { RevenueChart } from "@/components/revenue-chart";
 import {
-  DollarSign,
   ShoppingCart,
   Users,
   Package,
@@ -15,55 +13,66 @@ import {
 import Cookies from "js-cookie";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState(null);
-  const [activity, setActivity] = useState(null);
-  console.log(Cookies.get("adminToken"));
+  const token = Cookies.get("adminToken");
 
-  const fetchData = cache(async () => {
-    try {
-      const data = await fetch(
-        process.env.NEXT_PUBLIC_BACKEND_URL +
-          "api/admin/dashboard/get-dashboard-stats",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${Cookies.get("adminToken")}`,
-          },
-        }
-      );
-      const res = await data.json();
-      setStats(res.data);
-    } catch (error) {
-      console.log(error);
-    }
+  // ✅ Fetch functions
+  const fetchDashboardStats = async () => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}api/admin/dashboard/get-dashboard-stats`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    if (!res.ok) throw new Error("Failed to fetch dashboard stats");
+    const data = await res.json();
+    return data.data;
+  };
+
+  const fetchRecentActivity = async () => {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}api/admin/dashboard/get-recent-activity`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    if (!res.ok) throw new Error("Failed to fetch activity");
+    const data = await res.json();
+    return data.data;
+  };
+
+  // ✅ React Query hooks
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: fetchDashboardStats,
+    staleTime: 60 * 60 * 1000,
+    enabled: !!token,
   });
 
-  const fetchActivity = cache(async () => {
-    try {
-      const data = await fetch(
-        process.env.NEXT_PUBLIC_BACKEND_URL +
-          "api/admin/dashboard/get-recent-activity",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${Cookies.get("adminToken")}`,
-          },
-        }
-      );
-      const res = await data.json();
-      setActivity(res.data);
-    } catch (error) {
-      console.log(error);
-    }
+  const {
+    data: activity,
+    isLoading: activityLoading,
+    isError: activityError,
+  } = useQuery({
+    queryKey: ["dashboard-activity"],
+    queryFn: fetchRecentActivity,
+    staleTime: 60 * 60 * 1000,
+    enabled: !!token,
   });
-  useEffect(() => {
-    fetchData();
-    fetchActivity();
-  }, []);
 
-  if (!stats) {
+  // ✅ Loading State
+  if (statsLoading || activityLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
@@ -78,6 +87,16 @@ export default function DashboardPage() {
     );
   }
 
+  // ✅ Error State
+  if (statsError || activityError) {
+    return (
+      <div className="text-red-500">
+        Something went wrong while fetching dashboard data 😬
+      </div>
+    );
+  }
+
+  // ✅ Main UI
   return (
     <div className="space-y-6">
       <div className="animate-in fade-in slide-in-from-top duration-300">
@@ -93,19 +112,19 @@ export default function DashboardPage() {
           <div className="grid gap-4 md:grid-cols-3">
             <StatCard
               title="New Users"
-              value={stats.lastWeek.newUsers}
+              value={stats?.lastWeek?.newUsers}
               icon={Users}
               delay={0}
             />
             <StatCard
               title="New Orders"
-              value={stats.lastWeek.newOrders}
+              value={stats?.lastWeek?.newOrders}
               icon={ShoppingCart}
               delay={100}
             />
             <StatCard
               title="Revenue"
-              value={stats.lastWeek.revenue}
+              value={stats?.lastWeek?.revenue}
               icon={IndianRupee}
               delay={200}
             />
@@ -114,28 +133,28 @@ export default function DashboardPage() {
 
         <div>
           <h2 className="text-xl font-semibold mb-4">All Time</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Total Users"
-              value={stats.totals.users}
+              value={stats?.totals?.users}
               icon={Users}
               delay={0}
             />
             <StatCard
               title="Total Orders"
-              value={stats.totals.orders}
+              value={stats?.totals?.orders}
               icon={ShoppingCart}
               delay={100}
             />
             <StatCard
               title="Total Products"
-              value={stats.totals.products}
+              value={stats?.totals?.products}
               icon={Package}
               delay={200}
             />
-             <StatCard
+            <StatCard
               title="Revenue"
-              value={stats.totals.revenue}
+              value={stats?.totals?.revenue}
               icon={IndianRupee}
               delay={250}
             />

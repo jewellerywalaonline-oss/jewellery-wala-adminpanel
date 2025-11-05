@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,12 +17,10 @@ import { Drawer } from "@/components/drawer";
 import { ExportButtons } from "@/components/export-buttons";
 import { AlertDialogUse } from "@/components/alert-dialog";
 import { Plus } from "lucide-react";
-import { fetchData, createItem, updateItem, deleteItem } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { title } from "process";
 
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -75,9 +72,32 @@ export default function UsersPage() {
   const confirmDelete = async () => {
     if (!userToDelete) return;
 
-    await deleteItem(`${API_BASE}api/admin/user/delete`, userToDelete);
+    try {
+      const res = await axios.post(
+        `${API_BASE}api/admin/user/delete/${userToDelete}`,
+        {},
+        { headers: getAuthHeaders() }
+      );
+      if (res.ok || res.status === 200) {
+        toast({
+          title: res.data._message || "User deleted successfully",
+          description: "",
+        });
+      } else {
+        toast({
+          title: res.data._message || "User deleted successfully",
+          description: "",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: error.response?.data?._message || "Operation failed",
+        description: error.response?.data?._message || "Operation failed",
+        variant: "destructive",
+      });
+    }
     loadUsers();
-    toast({ title: "User deleted successfully" });
     setDeleteDialogOpen(false);
     setUserToDelete(null);
   };
@@ -142,7 +162,13 @@ export default function UsersPage() {
       label: "Role",
       render: (item) => (
         <Badge
-          variant={item.role === "admin" ? "default" : "secondary"}
+          variant={
+            item.role === "admin"
+              ? "default"
+              : item.role === "delivery"
+              ? "destructive"
+              : "outline"
+          }
           className="capitalize"
         >
           {item.role}
