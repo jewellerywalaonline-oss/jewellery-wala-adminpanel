@@ -37,6 +37,7 @@ export default function OrderDetailPage() {
   const { toast } = useToast();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [btnLoading, setBtnLoading] = useState(false);
   const [otp, setOtp] = useState("");
   const [isOtpDrawerOpen, setIsOtpDrawerOpen] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -102,6 +103,7 @@ export default function OrderDetailPage() {
 
   const handleOtpSend = async () => {
     try {
+      setBtnLoading(true);
       const token = Cookies.get("deliveryToken");
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_BACKEND_URL}api/website/orders/send-delivery-otp`,
@@ -113,8 +115,10 @@ export default function OrderDetailPage() {
           },
         }
       );
+      console.log(response);
+
       if (response.status !== 200) {
-        toast({
+        return toast({
           title: "Error",
           description: "Failed to send OTP",
           variant: "destructive",
@@ -131,6 +135,8 @@ export default function OrderDetailPage() {
         description: "Failed to send OTP. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setBtnLoading(false);
     }
   };
 
@@ -247,7 +253,7 @@ export default function OrderDetailPage() {
               : "Mark As Delivered"}
           </Button>
         </SheetTrigger>
-        <SheetContent side="bottom" className="h-[100vh]">
+        <SheetContent side="bottom" className="h-[90vh]">
           <SheetHeader>
             <SheetTitle className="text-center">Verify Delivery</SheetTitle>
             <SheetDescription className="text-center">
@@ -287,7 +293,9 @@ export default function OrderDetailPage() {
           </div>
         </SheetContent>
       </Sheet>
-      <Button variant="outline" className="ms-2" onClick={handleOtpSend}>Send OTP</Button>
+      <Button disabled={btnLoading} variant="outline" className="ms-2" onClick={handleOtpSend}>
+        {btnLoading ? "Sending..." : "Send OTP"}
+      </Button>
 
       {isSuccess && (
         <Dialog onOpenChange={() => setIsSuccess(false)}>
@@ -380,6 +388,7 @@ export default function OrderDetailPage() {
                   {order?.shippingAddress ? (
                     <div className="space-y-1">
                       <p>{order?.shippingAddress?.name}</p>
+                      <p>{order?.shippingAddress?.email}</p>
                       <p>{order?.shippingAddress?.addressLine1}</p>
                       {order?.shippingAddress?.addressLine2 && (
                         <p>{order?.shippingAddress?.addressLine2}</p>
