@@ -998,7 +998,9 @@ export default function ProductsPage() {
                 (url, index) =>
                   url &&
                   url.startsWith(
-                    "https://pub-50951b7722e041bebc7b86688a160a35.r2.dev/"
+                    "https://pub-50951b7722e041bebc7b86688a160a35.r2.dev/" ||
+                      "https://cdn.jewellerywalla.com/" ||
+                      "https://jewellerywalla.com/"
                   ) && (
                     <div key={index} className="flex items-center space-x-2">
                       <input
