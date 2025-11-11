@@ -18,8 +18,11 @@ import { Drawer } from "@/components/drawer";
 import { useToast } from "@/hooks/use-toast";
 import Cookies from "js-cookie";
 import Image from "next/image";
+import axios from "axios";
 export default function Orders() {
   const [orders, setOrders] = useState([]);
+  const [cancelOrder, setCancelOrder] = useState(null);
+  const [cancelOrderOpen, setCancelOrderOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -126,8 +129,73 @@ export default function Orders() {
         return "default";
       case "delivered":
         return "default";
+      case "cancelled":
+        return "destructive";
       default:
         return "secondary";
+    }
+  };
+
+  const handleCancelOrder = () => {
+    setCancelOrder(selectedOrder);
+    setDrawerOpen(false);
+    setCancelOrderOpen(true);
+  };
+
+  const confirmCancelOrder = async (e) => {
+    e.preventDefault();
+    if (!cancelOrder) {
+      toast({
+        title: "Error",
+        description: "Order not found",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (e.target.reason.value === "") {
+      toast({
+        title: "Error",
+        description: "Reason is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const token = Cookies.get("adminToken");
+      const data = await axios.post(
+        process.env.NEXT_PUBLIC_BACKEND_URL +
+          "api/website/orders/cancel-by-admin",
+        {
+          orderId: cancelOrder.orderId,
+          reason: e.target.reason.value,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const response = await data.data;
+      if (response.ok || response.success) {
+        toast({
+          title: "Success",
+          description: response.message || "Order cancelled successfully",
+        });
+        loadOrders();
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to cancel order",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to cancel order",
+        variant: "destructive",
+      });
     }
   };
 
@@ -254,6 +322,59 @@ export default function Orders() {
         onEdit={handleEdit}
         searchPlaceholder="Search orders..."
       />
+      <Drawer
+        isOpen={cancelOrderOpen}
+        direction="left"
+        onClose={() => {
+          setCancelOrderOpen(false);
+          setCancelOrder(null);
+        }}
+        title="Cancel Order"
+        className=" md:!w-[60vw] md:!max-w-[1800px] !w-full !max-w-full"
+      >
+        <form onSubmit={confirmCancelOrder} className="space-y-4 p-4">
+          <div className="space-y-2">
+            <label 
+              htmlFor="reason" 
+              className="block text-sm font-medium text-gray-700"
+            >
+              Reason for Cancellation
+              <span className="text-red-500 ml-1">*</span>
+            </label>
+            <textarea
+              name="reason"
+              id="reason"
+              rows={5}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+              placeholder="Please provide a reason for cancelling this order..."
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This information will be shared with the customer.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setCancelOrderOpen(false);
+                setCancelOrder(null);
+              }}
+              className="px-4 py-2"
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="destructive"
+              className="px-6 py-2"
+            >
+              Confirm Cancellation
+            </Button>
+          </div>
+        </form>
+      </Drawer>
 
       <Drawer
         isOpen={drawerOpen}
@@ -276,6 +397,16 @@ export default function Orders() {
           >
             <Truck className="h-4 w-4 mr-2" />
             Mark To Shipped
+          </Button>
+        )}
+        {selectedOrder?.status !== "delivered" && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => handleCancelOrder(selectedOrder)}
+            className="transition-all duration-200 hover:scale-105 w-full mt-4"
+          >
+            Cancel This Order
           </Button>
         )}
 

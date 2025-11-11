@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,6 @@ import {
 import { Loader2, Mail } from "lucide-react";
 
 export default function VerifyEmail() {
-  const { toast } = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email");
@@ -53,7 +52,7 @@ export default function VerifyEmail() {
     try {
       const token = Cookies.get("adminToken");
       const response = await fetch(
-        process.env.NEXT_PUBLIC_API_URL + "api/website/user/complete-verify",
+        process.env.NEXT_PUBLIC_BACKEND_URL + "api/website/user/complete-verify",
         {
           method: "POST",
           headers: {
@@ -75,6 +74,8 @@ export default function VerifyEmail() {
       if (data._status === true) {
         toast.success(data._message);
         router.push("/dashboard/profile");
+      } else {
+        toast.error(data._message);
       }
     } catch (error) {
       console.error("Verification error:", error);
@@ -91,7 +92,7 @@ export default function VerifyEmail() {
     try {
       const token = Cookies.get("adminToken");
       const response = await fetch(
-        process.env.NEXT_PUBLIC_API_URL + "api/website/user/verify-user",
+        process.env.NEXT_PUBLIC_BACKEND_URL + "api/website/user/verify-user",
         {
           method: "POST",
           headers: {
@@ -158,18 +159,17 @@ export default function VerifyEmail() {
                     setOtp(value);
                     setIsOtpComplete(value.length === 6);
                   }}
-                  render={({ slots }) => (
-                    <InputOTPGroup className="gap-2">
-                      {slots.map((slot, index) => (
-                        <InputOTPSlot
-                          key={index}
-                          {...slot}
-                          className="h-12 w-12 text-lg border-gray-300"
-                        />
-                      ))}
-                    </InputOTPGroup>
-                  )}
-                />
+                >
+                  <InputOTPGroup className="gap-2 flex">
+                    {[...Array(6)].map((_, index) => (
+                      <InputOTPSlot
+                        key={index}
+                        index={index}
+                        className="h-12 w-12 text-lg border-gray-300 focus-visible:ring-2 focus-visible:ring-amber-500 rounded-lg"
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
             </div>
 

@@ -1,43 +1,51 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useParams } from "next/navigation";
 import Cookies from "js-cookie";
+import Image from "next/image";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
+
 export default function page() {
   const { id } = useParams();
-  const [user, setUser] = useState({});
-  const [loading, setLoading] = useState(true);
   const apiBase = process.env.NEXT_PUBLIC_BACKEND_URL;
 
-  const getUser = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
+  const {
+    data: user,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["user", id],
+    queryFn: async () => {
+      const { data } = await axios.post(
         `${apiBase}api/admin/user/get-full-details/${id}`,
+        {},
         {
-          method: "POST",
           headers: {
-            "Content-Type": "application/json",
             Authorization: `Bearer ${Cookies.get("adminToken")}`,
           },
         }
       );
-      const data = await response.json();
-      setUser(data);
-      setLoading(false);
-    } catch (error) {
-      console.log(error);
-      setLoading(false);
-    }
-  };
+      return data;
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2,
+  });
 
-  useEffect(() => {
-    getUser();
-  }, [id]);
-  if (loading) {
+  if (isLoading) {
     return <div className="p-8">Loading user details...</div>;
   }
 
-  if (!user._user) {
+  if (error) {
+    return (
+      <div className="p-8 text-red-600">
+        Error loading user details: {error.message}
+      </div>
+    );
+  }
+
+  if (!user?._user) {
     return <div className="p-8">User not found</div>;
   }
 
@@ -151,6 +159,12 @@ export default function page() {
                           >
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center">
+                                <Image
+                                  src={item.product?.images[0] || ""}
+                                  alt={item.product?.name || ""}
+                                  width={50}
+                                  height={50}
+                                />
                                 <div className="ml-4">
                                   <div className="text-sm font-medium text-gray-900">
                                     {item.product?.name || "Product not found"}
@@ -185,10 +199,10 @@ export default function page() {
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
                               ₹
-                              {item.product?.price
-                                ? (item.product.price * item.quantity).toFixed(
-                                    2
-                                  )
+                              {item.product?.discount_price
+                                ? (
+                                    item.product.discount_price * item.quantity
+                                  ).toFixed(2)
                                 : "N/A"}
                             </td>
                           </tr>
@@ -208,7 +222,10 @@ export default function page() {
                               .reduce((total, item) => {
                                 return (
                                   total +
-                                  (item.product?.price || 0) * item.quantity
+                                  (item.product?.discount_price ||
+                                    item.product?.price ||
+                                    0) *
+                                    item.quantity
                                 );
                               }, 0)
                               .toFixed(2)}
@@ -265,6 +282,9 @@ export default function page() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -280,6 +300,9 @@ export default function page() {
                       <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                         {order.status || "Completed"}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      ₹{order.pricing.total}
                     </td>
                   </tr>
                 ))}
@@ -306,7 +329,7 @@ export default function page() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-medium text-gray-900">
-                      {review.product?.name || "Product not found"}
+                      {review.productId?.name || "Product not found"}
                     </h3>
                     <div className="flex items-center mt-1">
                       {[...Array(5)].map((_, i) => (
@@ -389,13 +412,65 @@ export default function page() {
           Wishlist ({_wishlist.length})
         </h2>
         {_wishlist.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4">
-            {_wishlist.map((item) => (
-              <div key={item._id} className="border rounded-lg p-4">
-                <p className="font-medium">Wishlist Item</p>
-                <p className="text-sm text-gray-500">
-                  Added on: {new Date(item.createdAt).toLocaleDateString()}
+          <div className="space-y-6">
+            {_wishlist.map((wishlistItem) => (
+              <div key={wishlistItem._id} className="border rounded-lg p-4">
+                <p className="text-sm text-gray-500 mb-3">
+                  Added on:{" "}
+                  {new Date(wishlistItem.createdAt).toLocaleDateString()}
                 </p>
+                <div className="space-y-4">
+                  {wishlistItem.products.map((product) => (
+                    <div
+                      key={product._id}
+                      className="flex items-start gap-4 border-b pb-4 last:border-0 last:pb-0"
+                    >
+                      <div className="w-20 h-20 flex-shrink-0">
+                        <img
+                          src={product.images[0] || "/placeholder-product.jpg"}
+                          alt={product.name}
+                          className="w-full h-full object-cover rounded"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">
+                          {product.name}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-gray-900 font-medium">
+                            ₹{product.discount_price || product.price}
+                          </span>
+                          {product.discount_price && (
+                            <span className="text-sm text-gray-500 line-through">
+                              ₹{product.price}
+                            </span>
+                          )}
+                          {product.discount_price && (
+                            <span className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded">
+                              {Math.round(
+                                ((product.price - product.discount_price) /
+                                  product.price) *
+                                  100
+                              )}
+                              % OFF
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-1">
+                          <span
+                            className={`text-sm ${
+                              product.stock > 0
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {product.stock > 0 ? "In Stock" : "Out of Stock"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>

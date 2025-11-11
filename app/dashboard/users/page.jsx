@@ -71,21 +71,22 @@ export default function UsersPage() {
 
   const confirmDelete = async () => {
     if (!userToDelete) return;
-
+    console.log(userToDelete);
     try {
       const res = await axios.post(
         `${API_BASE}api/admin/user/delete/${userToDelete}`,
         {},
         { headers: getAuthHeaders() }
       );
-      if (res.ok || res.status === 200) {
+      console.log(res);
+      if (res.data._status === true) {
         toast({
           title: res.data._message || "User deleted successfully",
           description: "",
         });
       } else {
         toast({
-          title: res.data._message || "User deleted successfully",
+          title: res.data._message || "Something went wrong",
           description: "",
           variant: "destructive",
         });
@@ -112,10 +113,16 @@ export default function UsersPage() {
           { role: formData.role },
           { headers: getAuthHeaders() }
         );
-        if (res.ok || res._status) {
+        if (res.data._status === true) {
           toast({
-            title: res._message || "User Role Changed",
+            title: res.data._message || "User Role Changed",
             description: "",
+          });
+        } else {
+          toast({
+            title: res.data._message || "Something went wrong",
+            description: "",
+            variant: "destructive",
           });
         }
       } catch (error) {
