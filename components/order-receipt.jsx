@@ -38,16 +38,16 @@ const formatDateTime = (dateString) => {
 };
 
 export function OrderReceipt({ isOpen, onClose, order }) {
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
+  // useEffect(() => {
+  //   if (isOpen) {
+  //     document.body.style.overflow = "hidden";
+  //   } else {
+  //     document.body.style.overflow = "unset";
+  //   }
+  //   return () => {
+  //     document.body.style.overflow = "unset";
+  //   };
+  // }, [isOpen]);
 
   const handlePrint = () => {
     const originalTitle = document.title;
@@ -67,7 +67,7 @@ export function OrderReceipt({ isOpen, onClose, order }) {
         onClick={onClose}
       />
 
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-4xl max-h-[90vh] overflow-auto animate-in zoom-in-95 fade-in duration-200 print:static print:max-h-none print:max-w-full print:overflow-visible print:translate-x-0 print:translate-y-0 print:w-full print:h-auto">
+      <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[999] w-full max-w-4xl max-h-[calc(100vh-5rem)] overflow-auto animate-in zoom-in-95 fade-in duration-200 print:static print:max-h-none print:max-w-full print:overflow-visible print:translate-x-0 print:translate-y-0 print:w-full print:h-auto">
         <div className="bg-white border border-gray-200 shadow-2xl print:border-0 print:shadow-none print:m-0">
           {/* Header with buttons - Hidden on print */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 print:hidden bg-gray-50">
@@ -103,12 +103,18 @@ export function OrderReceipt({ isOpen, onClose, order }) {
             <div className="bg-gray-50 p-4 rounded-lg mb-6 print:bg-gray-100">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Order Number</p>
+                  <p className="text-xs text-gray-500 uppercase mb-1">
+                    Order Number
+                  </p>
                   <p className="font-semibold text-sm">{order.orderId}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Order Date</p>
-                  <p className="font-semibold text-sm">{formatDateTime(order.createdAt)}</p>
+                  <p className="text-xs text-gray-500 uppercase mb-1">
+                    Order Date
+                  </p>
+                  <p className="font-semibold text-sm">
+                    {formatDateTime(order.createdAt)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -118,8 +124,12 @@ export function OrderReceipt({ isOpen, onClose, order }) {
               <div className="flex items-center gap-3">
                 <Package className="h-6 w-6 text-blue-600" />
                 <div>
-                  <p className="text-xs text-gray-600 uppercase font-semibold">Package ID</p>
-                  <p className="text-lg font-bold text-blue-900">{order.packageId}</p>
+                  <p className="text-xs text-gray-600 uppercase font-semibold">
+                    Package ID
+                  </p>
+                  <p className="text-lg font-bold text-blue-900">
+                    {order.packageId}
+                  </p>
                 </div>
               </div>
             </div>
@@ -132,11 +142,15 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                   Shipping Address
                 </h3>
                 <div className="text-sm space-y-1">
-                  <p className="font-semibold">{order.shippingAddress?.fullName}</p>
+                  <p className="font-semibold">
+                    {order.shippingAddress?.fullName}
+                  </p>
                   <p>{order.shippingAddress?.street}</p>
                   <p>{order.shippingAddress?.area}</p>
                   <p>
-                    {order.shippingAddress?.city}, {order.shippingAddress?.state} {order.shippingAddress?.pincode}
+                    {order.shippingAddress?.city},{" "}
+                    {order.shippingAddress?.state}{" "}
+                    {order.shippingAddress?.pincode}
                   </p>
                   <p>{order.shippingAddress?.country}</p>
                   <p className="pt-2">Phone: {order.shippingAddress?.phone}</p>
@@ -182,10 +196,16 @@ export function OrderReceipt({ isOpen, onClose, order }) {
               <table className="w-full text-sm">
                 <thead className="bg-gray-100 border-y border-gray-300">
                   <tr>
-                    <th className="text-left py-3 px-2 font-semibold">Product</th>
+                    <th className="text-left py-3 px-2 font-semibold">
+                      Product
+                    </th>
                     <th className="text-center py-3 px-2 font-semibold">Qty</th>
-                    <th className="text-right py-3 px-2 font-semibold">Price</th>
-                    <th className="text-right py-3 px-2 font-semibold">Total</th>
+                    <th className="text-right py-3 px-2 font-semibold">
+                      Price
+                    </th>
+                    <th className="text-right py-3 px-2 font-semibold">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,9 +224,13 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                           </div>
                           <div>
                             <p className="font-medium">{item.name}</p>
-                            {item.colorId && typeof item.colorId === 'object' && item.colorId.name && (
-                              <p className="text-xs text-gray-600">Color: {item.colorId.name}</p>
-                            )}
+                            {item.colorId &&
+                              typeof item.colorId === "object" &&
+                              item.colorId.name && (
+                                <p className="text-xs text-gray-600">
+                                  Color: {item.colorId.name}
+                                </p>
+                              )}
                             {item.isPersonalized && item.personalizedName && (
                               <p className="text-xs text-gray-600">
                                 Personalized: {item.personalizedName}
@@ -220,7 +244,10 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                         ₹{item.priceAtPurchase?.toLocaleString("en-IN")}
                       </td>
                       <td className="py-4 px-2 text-right font-semibold">
-                        ₹{(item.priceAtPurchase * item.quantity)?.toLocaleString("en-IN")}
+                        ₹
+                        {(item.priceAtPurchase * item.quantity)?.toLocaleString(
+                          "en-IN"
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -242,7 +269,8 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                     <div className="flex justify-between py-2">
                       <span className="text-gray-600">Discount:</span>
                       <span className="font-semibold text-green-600">
-                        -₹{order.pricing.discount.amount?.toLocaleString("en-IN")}
+                        -₹
+                        {order.pricing.discount.amount?.toLocaleString("en-IN")}
                       </span>
                     </div>
                   )}
@@ -285,7 +313,8 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                   Questions about your order? Contact us at support@admin.com
                 </p>
                 <p className="text-xs text-gray-500 mt-4">
-                  This is a computer-generated invoice and does not require a signature.
+                  This is a computer-generated invoice and does not require a
+                  signature.
                 </p>
               </div>
             </div>
@@ -299,23 +328,23 @@ export function OrderReceipt({ isOpen, onClose, order }) {
             margin: 0.5cm;
             size: A4;
           }
-          
+
           body {
             margin: 0 !important;
             padding: 0 !important;
           }
-          
+
           body * {
             visibility: hidden;
           }
-          
+
           .fixed:has(#receipt-content),
           .fixed:has(#receipt-content) *,
           #receipt-content,
           #receipt-content * {
             visibility: visible;
           }
-          
+
           .fixed:has(#receipt-content) {
             position: absolute !important;
             left: 0 !important;
@@ -329,28 +358,29 @@ export function OrderReceipt({ isOpen, onClose, order }) {
             margin: 0 !important;
             padding: 0 !important;
           }
-          
+
           #receipt-content {
             padding: 0.5cm !important;
             margin: 0 !important;
           }
-          
+
           /* Ensure colors print */
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
           }
-          
+
           /* Prevent page breaks in critical sections */
-          .bg-gray-50, .bg-blue-50 {
+          .bg-gray-50,
+          .bg-blue-50 {
             page-break-inside: avoid;
           }
-          
+
           table {
             page-break-inside: auto;
           }
-          
+
           tr {
             page-break-inside: avoid;
             page-break-after: auto;
