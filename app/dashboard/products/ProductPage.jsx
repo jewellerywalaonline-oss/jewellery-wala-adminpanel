@@ -430,10 +430,16 @@ export default function ProductsPage() {
           `Failed to ${editingProduct ? "update" : "create"} product`;
         throw new Error(errorMessage);
       }
+      console.log(response);
+      
+      if (response._status) {
+        toast({
+          title: `Product ${
+            editingProduct ? "updated" : "created"
+          } successfully`,
+        });
+      }
 
-      toast({
-        title: `Product ${editingProduct ? "updated" : "created"} successfully`,
-      });
       closeDrawer();
       loadProducts();
     } catch (error) {
