@@ -431,7 +431,7 @@ export default function ProductsPage() {
         throw new Error(errorMessage);
       }
       console.log(response);
-      
+
       if (response._status) {
         toast({
           title: `Product ${
@@ -1003,11 +1003,7 @@ export default function ProductsPage() {
               {formData.additionalImagePreviews?.map(
                 (url, index) =>
                   url &&
-                  url.startsWith(
-                    "https://pub-50951b7722e041bebc7b86688a160a35.r2.dev/" ||
-                      "https://cdn.jewellerywalla.com/" ||
-                      "https://jewellerywalla.com/"
-                  ) && (
+                  url.startsWith("https://cdn.jewellerywalla.com/") && (
                     <div key={index} className="flex items-center space-x-2">
                       <input
                         type="text"

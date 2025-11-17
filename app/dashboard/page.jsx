@@ -10,6 +10,7 @@ import {
   Package,
   IndianRupee,
 } from "lucide-react";
+import RefundedOrdersAdmin from "@/components/RefundedOrdersAdmin";
 import Cookies from "js-cookie";
 
 export default function DashboardPage() {
@@ -160,6 +161,11 @@ export default function DashboardPage() {
             />
           </div>
         </div>
+      </div>
+
+      {/* refunded orders */}
+      <div className="">
+        <RefundedOrdersAdmin />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
