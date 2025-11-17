@@ -16,7 +16,7 @@ const RefundedOrdersAdmin = () => {
   const [activeTab, setActiveTab] = useState('mismatched');
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState(null);
-  const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000/';
+  const BACKEND_URL = process.env.NEXT_PUBLICBACKEND_URL || 'http://localhost:5000/';
   const BASE_URL = `${BACKEND_URL}api/admin/orders`;
 
   const syncAllFromRazorpay = async () => {
