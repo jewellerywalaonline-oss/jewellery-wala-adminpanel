@@ -32,7 +32,7 @@ const RefundedOrdersAdmin = () => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          // 'Content-Type': 'application/json'
         }
       });
 
@@ -72,7 +72,7 @@ const RefundedOrdersAdmin = () => {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          // 'Content-Type': 'application/json'
         }
       });
 
@@ -103,7 +103,7 @@ const RefundedOrdersAdmin = () => {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          // 'Content-Type': 'application/json'
         }
       });
 
@@ -169,7 +169,7 @@ const RefundedOrdersAdmin = () => {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          // 'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           refundStatus: statusToUse,

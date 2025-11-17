@@ -267,8 +267,8 @@ export default function Orders() {
       ),
     },
     {
-      key: "actions",
-      label: "Actions",
+      key: "billing",
+      label: "Billing",
       render: (item) => (
         <Button
           variant="outline"
