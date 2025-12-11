@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Table,
@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-export function DataTable({
+function DataTableContent({
   data,
   columns,
   onEdit,
@@ -345,5 +345,21 @@ export function DataTable({
         </div>
       )}
     </div>
+  );
+}
+
+// Wrapper component with Suspense to handle useSearchParams
+export function DataTable(props) {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4 animate-pulse">
+          <div className="h-10 bg-muted rounded"></div>
+          <div className="h-64 bg-muted rounded"></div>
+        </div>
+      }
+    >
+      <DataTableContent {...props} />
+    </Suspense>
   );
 }
