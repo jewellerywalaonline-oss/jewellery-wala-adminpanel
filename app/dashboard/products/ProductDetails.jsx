@@ -2,19 +2,14 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
 import {
-  ShoppingCart,
-  Heart,
-  Share2,
   Tag,
   Hash,
   Box,
   Clock,
   CheckCircle,
   Star,
-  Shield,
   Calendar,
 } from "lucide-react";
 import ProductReviews from "./product-reviews";
@@ -23,7 +18,6 @@ export default function ProductDetails({ product }) {
   const [mainImage, setMainImage] = useState(product.image);
   const [selectedColor, setSelectedColor] = useState(product.colors?.[0]);
 
-  console.log(product);
 
   const handleThumbnailClick = (img) => {
     setMainImage(img);

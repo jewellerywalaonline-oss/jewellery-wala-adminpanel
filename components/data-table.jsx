@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -44,8 +45,15 @@ export function DataTable({
   dateOption,
   searchPlaceholder = "Search...",
 }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Get initial page from URL or default to 1
+  const initialPage = parseInt(searchParams.get("page") || "1", 10);
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(initialPage);
   const [selectedOption, setSelectedOption] = useState("");
   const [dateFilter, setDateFilter] = useState({
     type: "all", // 'all', 'lastMonth', 'custom'
@@ -54,6 +62,32 @@ export function DataTable({
   });
   const [filteredData, setFilteredData] = useState(data);
   const itemsPerPage = 10;
+
+  // Update URL when page changes
+  const updatePageInUrl = useCallback(
+    (page) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (page === 1) {
+        params.delete("page");
+      } else {
+        params.set("page", page.toString());
+      }
+      const queryString = params.toString();
+      router.push(queryString ? `${pathname}?${queryString}` : pathname, {
+        scroll: false,
+      });
+    },
+    [searchParams, router, pathname]
+  );
+
+  // Handle page change
+  const handlePageChange = useCallback(
+    (newPage) => {
+      setCurrentPage(newPage);
+      updatePageInUrl(newPage);
+    },
+    [updatePageInUrl]
+  );
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -64,7 +98,7 @@ export function DataTable({
 
   const handleSelectChange = (value) => {
     setSelectedOption(value);
-    setCurrentPage(1);
+    handlePageChange(1);
     const filteredData = data.filter((item) => item.status === value);
     setFilteredData(filteredData);
   };
@@ -118,7 +152,7 @@ export function DataTable({
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-              setCurrentPage(1);
+              handlePageChange(1);
             }}
             className="pl-10 transition-all duration-200 focus:scale-[1.02]"
           />
@@ -267,19 +301,41 @@ export function DataTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
               disabled={currentPage === 1}
               className="transition-all duration-200 hover:scale-105"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-sm font-medium">
-              Page {currentPage} of {totalPages}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-sm text-muted-foreground">Page</span>
+              <Select
+                value={currentPage.toString()}
+                onValueChange={(value) => handlePageChange(parseInt(value, 10))}
+              >
+                <SelectTrigger className="w-[70px] h-8">
+                  <SelectValue placeholder={currentPage} />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <SelectItem key={page} value={page.toString()}>
+                        {page}
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                of {totalPages}
+              </span>
+            </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() =>
+                handlePageChange(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
               className="transition-all duration-200 hover:scale-105"
             >
