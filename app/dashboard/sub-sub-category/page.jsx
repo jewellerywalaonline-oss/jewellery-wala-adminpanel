@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import SubSubCategoriesClient from "./SubSubCatClient";
 
+export const dynamic = "force-dynamic";
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 async function getSubSubCategories(token) {
