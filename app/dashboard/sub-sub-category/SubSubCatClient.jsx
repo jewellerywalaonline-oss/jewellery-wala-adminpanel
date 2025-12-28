@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,17 +26,103 @@ const getAuthHeadersFormData = () => ({
   Authorization: `Bearer ${Cookies.get("adminToken")}`,
 });
 
+// API functions
+const fetchSubCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/subCategory/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error("Failed to load sub categories");
+  const data = await response.json();
+  return data._data || data;
+};
+
+const fetchSubSubCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/subSubCategory/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error("Failed to load sub sub categories");
+  const data = await response.json();
+  return Array.isArray(data?._data)
+    ? data._data
+    : Array.isArray(data)
+    ? data
+    : [];
+};
+
+const createSubSubCategory = async (formData) => {
+  const response = await fetch(`${API_BASE}api/admin/subSubCategory/create`, {
+    method: "POST",
+    headers: getAuthHeadersFormData(),
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(
+      data._message || data.message || "Error creating sub sub category"
+    );
+  }
+  return data;
+};
+
+const updateSubSubCategory = async ({ id, formData }) => {
+  const response = await fetch(
+    `${API_BASE}api/admin/subSubCategory/update/${id}`,
+    {
+      method: "PUT",
+      headers: getAuthHeadersFormData(),
+      body: formData,
+    }
+  );
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(
+      data._message || data.message || "Error updating sub sub category"
+    );
+  }
+  return data;
+};
+
+const deleteSubSubCategory = async (id) => {
+  const response = await fetch(
+    `${API_BASE}api/admin/subSubCategory/delete/${id}`,
+    {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ id }),
+    }
+  );
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(data._message || "Error deleting sub sub category");
+  }
+  return data;
+};
+
+const changeSubSubCategoryStatus = async (id) => {
+  const response = await fetch(
+    `${API_BASE}api/admin/subSubCategory/change-status/${id}`,
+    {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ id }),
+    }
+  );
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(data._message || "Error changing status");
+  }
+  return data;
+};
+
 export default function SubSubCategoriesClient({
   initialSubSubCategories,
   initialSubCategories,
 }) {
-  const [subSubCategories, setSubSubCategories] = useState(
-    initialSubSubCategories
-  );
-  const [subCategories, setSubCategories] = useState(initialSubCategories);
   const [categoryId, setCategoryId] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [btnLoading, setBtnLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -46,57 +133,80 @@ export default function SubSubCategoriesClient({
     image: null,
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadSubCategories = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/subCategory/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
-      });
+  // React Query hooks
+  const { data: subCategories = initialSubCategories } = useQuery({
+    queryKey: ["subCategories"],
+    queryFn: fetchSubCategories,
+    initialData: initialSubCategories,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error("Failed to load sub categories");
-      }
+  const { data: subSubCategories = initialSubSubCategories, isLoading } =
+    useQuery({
+      queryKey: ["subSubCategories"],
+      queryFn: fetchSubSubCategories,
+      initialData: initialSubSubCategories,
+      staleTime: 5 * 60 * 1000,
+    });
 
-      const data = await response.json();
-      setSubCategories(data._data || data);
-    } catch (error) {
-      console.error("Error loading sub categories:", error);
-      toast({ title: "Error loading sub categories", variant: "destructive" });
-    }
-  };
+  const createMutation = useMutation({
+    mutationFn: createSubSubCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subSubCategories"] });
+      toast({ title: "Sub sub category created successfully" });
+      closeDrawer();
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
 
-  const loadSubSubCategories = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}api/admin/subSubCategory/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
-      });
+  const updateMutation = useMutation({
+    mutationFn: updateSubSubCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subSubCategories"] });
+      toast({ title: "Sub sub category updated successfully" });
+      closeDrawer();
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
 
-      if (!response.ok) {
-        throw new Error("Failed to load sub sub categories");
-      }
+  const deleteMutation = useMutation({
+    mutationFn: deleteSubSubCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subSubCategories"] });
+      toast({ title: "Sub sub category deleted successfully" });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+  });
 
-      const data = await response.json();
-      setSubSubCategories(
-        Array.isArray(data?._data)
-          ? data._data
-          : Array.isArray(data)
-          ? data
-          : []
-      );
-    } catch (error) {
-      console.error("Error loading sub sub categories:", error);
-      toast({
-        title: "Error loading sub sub categories",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  const statusMutation = useMutation({
+    mutationFn: changeSubSubCategoryStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subSubCategories"] });
+      toast({ title: "Sub sub category status updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditingCategory(null);
+    setFormData({ name: "", image: null });
+    setImagePreview(null);
+    setCategoryId([]);
   };
 
   const handleEdit = (category) => {
@@ -105,7 +215,6 @@ export default function SubSubCategoriesClient({
       name: category.name,
       image: null,
     });
-    // Set the sub category IDs for editing
     setCategoryId(
       Array.isArray(category.subCategory)
         ? category.subCategory.map((cat) => cat._id || cat)
@@ -115,43 +224,14 @@ export default function SubSubCategoriesClient({
     setDrawerOpen(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setCategoryToDelete(id);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!categoryToDelete) return;
-
-    setBtnLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/subSubCategory/delete/${categoryToDelete}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: categoryToDelete }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || data._status === false) {
-        throw new Error(data._message || "Error deleting sub sub category");
-      }
-
-      toast({ title: "Sub sub category deleted successfully" });
-      await loadSubSubCategories();
-    } catch (error) {
-      console.error("Error deleting sub sub category:", error);
-      toast({
-        title: error.message || "Error deleting sub sub category",
-        variant: "destructive",
-      });
-    } finally {
-      setBtnLoading(false);
-      setDeleteDialogOpen(false);
-      setCategoryToDelete(null);
+  const confirmDelete = () => {
+    if (categoryToDelete) {
+      deleteMutation.mutate(categoryToDelete);
     }
   };
 
@@ -167,7 +247,7 @@ export default function SubSubCategoriesClient({
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
@@ -186,102 +266,31 @@ export default function SubSubCategoriesClient({
       return;
     }
 
-    setBtnLoading(true);
-    try {
-      const submitData = new FormData();
-      submitData.append("name", formData.name);
-      if (formData.image instanceof File) {
-        submitData.append("image", formData.image);
-      }
-      categoryId.forEach((id) => submitData.append("subCategory[]", id));
+    const submitData = new FormData();
+    submitData.append("name", formData.name);
+    if (formData.image instanceof File) {
+      submitData.append("image", formData.image);
+    }
+    categoryId.forEach((id) => submitData.append("subCategory[]", id));
 
-      let response;
-
-      if (editingCategory) {
-        response = await fetch(
-          `${API_BASE}api/admin/subSubCategory/update/${editingCategory._id}`,
-          {
-            method: "PUT",
-            headers: getAuthHeadersFormData(),
-            body: submitData,
-          }
-        );
-      } else {
-        response = await fetch(`${API_BASE}api/admin/subSubCategory/create`, {
-          method: "POST",
-          headers: getAuthHeadersFormData(),
-          body: submitData,
-        });
-      }
-
-      const data = await response.json();
-
-      if (!response.ok || data._status === false) {
-        throw new Error(
-          data._message || data.message || "Error saving sub sub category"
-        );
-      }
-
-      toast({
-        title: editingCategory
-          ? "Sub sub category updated successfully"
-          : "Sub sub category created successfully",
-      });
-
-      setDrawerOpen(false);
-      setEditingCategory(null);
-      setFormData({ name: "", image: null });
-      setImagePreview(null);
-      setCategoryId([]);
-
-      await loadSubSubCategories();
-    } catch (error) {
-      console.error("Error saving sub sub category:", error);
-      toast({
-        title: error.message || "Error saving sub sub category",
-        variant: "destructive",
-      });
-    } finally {
-      setBtnLoading(false);
+    if (editingCategory) {
+      updateMutation.mutate({ id: editingCategory._id, formData: submitData });
+    } else {
+      createMutation.mutate(submitData);
     }
   };
 
-  const handleChangeStatus = async (category) => {
-    setBtnLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/subSubCategory/change-status/${category._id}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: category._id }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || data._status === false) {
-        throw new Error(data._message || "Error changing status");
-      }
-
-      toast({
-        title: `Sub sub category ${
-          category.status ? "deactivated" : "activated"
-        } successfully`,
-      });
-      await loadSubSubCategories();
-    } catch (error) {
-      console.error("Error changing status:", error);
-      toast({
-        title: error.message || "Error changing status",
-        variant: "destructive",
-      });
-    } finally {
-      setBtnLoading(false);
-    }
+  const handleChangeStatus = (category) => {
+    statusMutation.mutate(category._id);
   };
 
-  if (loading) {
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    statusMutation.isPending;
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
@@ -321,7 +330,7 @@ export default function SubSubCategoriesClient({
               setDrawerOpen(true);
             }}
             className="transition-all duration-200 hover:scale-105"
-            disabled={btnLoading}
+            disabled={isPending}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Sub Sub Category
@@ -402,7 +411,7 @@ export default function SubSubCategoriesClient({
                         size="sm"
                         onClick={() => handleEdit(category)}
                         className="flex-1 transition-all duration-200 hover:scale-105"
-                        disabled={btnLoading}
+                        disabled={isPending}
                       >
                         <Edit className="h-3 w-3 mr-2" />
                         Edit
@@ -412,7 +421,7 @@ export default function SubSubCategoriesClient({
                         size="sm"
                         onClick={() => handleDelete(category._id)}
                         className="flex-1 transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
-                        disabled={btnLoading}
+                        disabled={isPending}
                       >
                         <Trash2 className="h-3 w-3 mr-2" />
                         Delete
@@ -423,9 +432,9 @@ export default function SubSubCategoriesClient({
                       size="sm"
                       onClick={() => handleChangeStatus(category)}
                       className="w-full transition-all duration-200"
-                      disabled={btnLoading}
+                      disabled={isPending}
                     >
-                      {btnLoading ? (
+                      {statusMutation.isPending ? (
                         <Loader2 className="h-3 w-3 mr-2 animate-spin" />
                       ) : null}
                       {category.status ? "Deactivate" : "Activate"}
@@ -441,13 +450,7 @@ export default function SubSubCategoriesClient({
       <Drawer
         isOpen={drawerOpen}
         onClose={() => {
-          if (!btnLoading) {
-            setDrawerOpen(false);
-            setEditingCategory(null);
-            setFormData({ name: "", image: null });
-            setImagePreview(null);
-            setCategoryId([]);
-          }
+          if (!isPending) closeDrawer();
         }}
         title={
           editingCategory ? "Edit Sub Sub Category" : "Add Sub Sub Category"
@@ -462,7 +465,7 @@ export default function SubSubCategoriesClient({
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              disabled={btnLoading}
+              disabled={isPending}
               placeholder="Enter sub sub category name"
             />
           </div>
@@ -474,7 +477,7 @@ export default function SubSubCategoriesClient({
               type="file"
               accept="image/*"
               onChange={handleImageChange}
-              disabled={btnLoading}
+              disabled={isPending}
             />
             {imagePreview && (
               <div className="relative w-full h-40 rounded-lg overflow-hidden border border-muted mt-2">
@@ -492,7 +495,7 @@ export default function SubSubCategoriesClient({
                     setFormData({ ...formData, image: null });
                   }}
                   className="absolute top-2 right-2 rounded-full h-6 w-6 p-0"
-                  disabled={btnLoading}
+                  disabled={isPending}
                 >
                   ✕
                 </Button>
@@ -509,16 +512,16 @@ export default function SubSubCategoriesClient({
               category={subCategories}
               categoryId={categoryId}
               setCategoryId={setCategoryId}
-              disabled={btnLoading}
+              disabled={isPending}
             />
           </div>
 
           <Button
             onClick={handleSubmit}
             className="z-[10] w-full animate-in slide-in-from-bottom duration-300 delay-150"
-            disabled={btnLoading}
+            disabled={isPending}
           >
-            {btnLoading ? (
+            {createMutation.isPending || updateMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {editingCategory ? "Updating..." : "Creating..."}
@@ -537,7 +540,7 @@ export default function SubSubCategoriesClient({
       <AlertDialogUse
         isOpen={deleteDialogOpen}
         onClose={() => {
-          if (!btnLoading) {
+          if (!deleteMutation.isPending) {
             setDeleteDialogOpen(false);
             setCategoryToDelete(null);
           }
@@ -545,8 +548,8 @@ export default function SubSubCategoriesClient({
         onConfirm={confirmDelete}
         title="Delete Sub Sub Category"
         description="Are you sure you want to delete this sub sub category? This action cannot be undone."
-        confirmText={btnLoading ? "Deleting..." : "Delete"}
-        confirmDisabled={btnLoading}
+        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmDisabled={deleteMutation.isPending}
       />
     </div>
   );

@@ -40,6 +40,7 @@ export function Header() {
     { label: "FAQs", href: "/dashboard/faqs" },
     { label: "Why Choose Us", href: "/dashboard/why-choose-us" },
     { label: "Materials & Colors", href: "/dashboard/materials" },
+    { label: "Sizes", href: "/dashboard/sizes" },
     { label: "Settings", href: "/dashboard/settings" },
   ];
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import NewMultiSelect from "../../../components/NewMultiSelect";
 import Cookies from "js-cookie";
 import Image from "next/image";
-import ProductDetails from "./ProductDetails";
 import { useRouter } from "next/navigation";
 
 const INITIAL_FORM_STATE = {
@@ -42,23 +42,161 @@ const INITIAL_FORM_STATE = {
   additionalImagePreviews: ["", "", "", "", ""],
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+const getAuthHeaders = () => ({
+  Authorization: `Bearer ${Cookies.get("adminToken")}`,
+});
+
+// API functions
+const fetchColors = async () => {
+  const response = await fetch(`${API_BASE}api/admin/color/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return data._data || [];
+  }
+  return [];
+};
+
+const fetchMaterials = async () => {
+  const response = await fetch(`${API_BASE}api/admin/material/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return data._data || [];
+  }
+  return [];
+};
+
+const fetchSizes = async () => {
+  const response = await fetch(`${API_BASE}api/admin/size/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return data._data || [];
+  }
+  return [];
+};
+
+const fetchCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/category/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return data._data || [];
+  }
+  return [];
+};
+
+const fetchSubCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/subCategory/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return data._data || [];
+  }
+  return [];
+};
+
+const fetchSubSubCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/subSubCategory/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (response.ok) {
+    const data = await response.json();
+    return Array.isArray(data?._data) ? data._data : [];
+  }
+  return [];
+};
+
+const fetchProducts = async () => {
+  const response = await fetch(
+    `${API_BASE}api/admin/product/view?showDeleted=true`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({}),
+    }
+  );
+  const data = await response.json();
+  return data._data || [];
+};
+
+const deleteProduct = async (id) => {
+  const response = await fetch(`${API_BASE}api/admin/product/delete/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ id }),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.message || errorData.error || "Failed to delete product"
+    );
+  }
+  return response.json();
+};
+
+const changeProductStatus = async (id) => {
+  const response = await fetch(
+    `${API_BASE}api/admin/product/change-status/${id}`,
+    {
+      method: "PUT",
+      headers: getAuthHeaders(),
+    }
+  );
+  if (!response.ok) throw new Error("Failed to update status");
+  return response.json();
+};
+
+const saveProduct = async ({ formData, editingProduct }) => {
+  const url = editingProduct
+    ? `${API_BASE}api/admin/product/update/${editingProduct._id}`
+    : `${API_BASE}api/admin/product/create`;
+
+  const response = await fetch(url, {
+    method: editingProduct ? "PUT" : "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.message ||
+        errorData.error ||
+        `Failed to ${editingProduct ? "update" : "create"} product`
+    );
+  }
+  return response.json();
+};
+
 export default function ProductsPage() {
-  const [colors, setColors] = useState([]);
-  const [materials, setMaterials] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [subCategories, setSubCategories] = useState([]);
-  const [subSubCategories, setSubSubCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState([]);
   const [selectedSubCategory, setSelectedSubCategory] = useState([]);
   const [selectedSubSubCategory, setSelectedSubSubCategory] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
   const [selectedMaterials, setSelectedMaterials] = useState([]);
-
+  const [selectedSizes, setSelectedSizes] = useState([]);
   const [removeImagesUrl, setRemoveImagesUrl] = useState([]);
-
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [btnLoading, setBtnLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [alertOpen, setAlertOpen] = useState(false);
@@ -66,124 +204,106 @@ export default function ProductsPage() {
   const [formData, setFormData] = useState(INITIAL_FORM_STATE);
 
   const { toast } = useToast();
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const getAuthHeaders = () => ({
-    Authorization: `Bearer ${Cookies.get("adminToken")}`,
+  // React Query hooks for fetching data
+  const { data: colors = [] } = useQuery({
+    queryKey: ["colors"],
+    queryFn: fetchColors,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const loadColors = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/color/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
+  const { data: materials = [] } = useQuery({
+    queryKey: ["materials"],
+    queryFn: fetchMaterials,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: sizes = [] } = useQuery({
+    queryKey: ["sizes"],
+    queryFn: fetchSizes,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: subCategories = [] } = useQuery({
+    queryKey: ["subCategories"],
+    queryFn: fetchSubCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: subSubCategories = [] } = useQuery({
+    queryKey: ["subSubCategories"],
+    queryFn: fetchSubSubCategories,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const {
+    data: products = [],
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["products"],
+    queryFn: fetchProducts,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Mutations
+  const deleteMutation = useMutation({
+    mutationFn: deleteProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Product deleted successfully" });
+      setAlertOpen(false);
+      setDeleteId(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting product",
+        description: error.message,
+        variant: "destructive",
       });
-      if (response.ok) {
-        const data = await response.json();
-        setColors(data._data || []);
-      }
-    } catch (error) {
-      console.error("Error loading colors:", error);
-    }
-  };
+      setAlertOpen(false);
+      setDeleteId(null);
+    },
+  });
 
-  const loadMaterials = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/material/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
+  const statusMutation = useMutation({
+    mutationFn: changeProductStatus,
+    onSuccess: (_, productId) => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Status updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: "Error updating product status", variant: "destructive" });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: saveProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({
+        title: `Product ${editingProduct ? "updated" : "created"} successfully`,
       });
-      if (response.ok) {
-        const data = await response.json();
-        setMaterials(data._data || []);
-      }
-    } catch (error) {
-      console.error("Error loading materials:", error);
-    }
-  };
-
-  const loadCategories = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/category/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
+      closeDrawer();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error saving product",
+        description: error.message,
+        variant: "destructive",
       });
-      if (response.ok) {
-        const data = await response.json();
-        setCategories(data._data || []);
-      }
-    } catch (error) {
-      console.error("Error loading categories:", error);
-    }
-  };
-
-  const loadSubCategories = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/subCategory/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSubCategories(data._data || []);
-      }
-    } catch (error) {
-      console.error("Error loading subcategories:", error);
-    }
-  };
-
-  const loadSubSubCategories = async () => {
-    try {
-      const response = await fetch(`${API_BASE}api/admin/subSubCategory/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSubSubCategories(Array.isArray(data?._data) ? data._data : []);
-      }
-    } catch (error) {
-      console.error("Error loading sub-subcategories:", error);
-    }
-  };
-
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/product/view?showDeleted=true`,
-        {
-          method: "POST",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({}),
-        }
-      );
-      const data = await response.json();
-      setProducts(data._data || []);
-    } catch (error) {
-      console.error("Error loading products:", error);
-      toast({ title: "Error loading products", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadColors();
-    loadMaterials();
-    loadCategories();
-    loadSubCategories();
-    loadSubSubCategories();
-    loadProducts();
-  }, []);
+    },
+  });
 
   const handleEdit = (product) => {
-    // Set default values for any potentially undefined properties
     const defaultProduct = {
       name: "",
       price: 0,
@@ -192,7 +312,6 @@ export default function ProductsPage() {
       code: "",
       discount_price: 0,
       description: "",
-
       estimated_delivery_time: "",
       status: true,
       isFeatured: false,
@@ -211,7 +330,8 @@ export default function ProductsPage() {
       subSubCategory: [],
       colors: [],
       materials: [],
-      ...product, // Spread the actual product data to override defaults
+      sizes: [],
+      ...product,
     };
 
     setEditingProduct(defaultProduct);
@@ -242,10 +362,9 @@ export default function ProductsPage() {
             ...Array(5 - defaultProduct.images.length).fill(""),
           ]
         : ["", "", "", "", ""],
-      additionalImages: Array(5).fill(null), // Initialize with nulls for file inputs
+      additionalImages: Array(5).fill(null),
     });
 
-    // Safely handle array properties
     setSelectedCategory(
       Array.isArray(defaultProduct.category)
         ? defaultProduct.category
@@ -279,48 +398,23 @@ export default function ProductsPage() {
             .filter(Boolean)
         : []
     );
+    setSelectedSizes(
+      Array.isArray(defaultProduct.sizes)
+        ? defaultProduct.sizes.map((item) => item._id || item).filter(Boolean)
+        : []
+    );
 
     setDrawerOpen(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setDeleteId(id);
     setAlertOpen(true);
   };
 
-  const confirmDelete = async () => {
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/product/delete/${deleteId}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: deleteId }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.message || errorData.error || "Failed to delete product";
-        throw new Error(errorMessage);
-      }
-
-      toast({ title: "Product deleted successfully" });
-      loadProducts();
-    } catch (error) {
-      console.error("Error deleting product:", error);
-      const errorMessage =
-        error.message ||
-        "An unexpected error occurred while deleting the product";
-      toast({
-        title: "Error deleting product",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setAlertOpen(false);
-      setDeleteId(null);
+  const confirmDelete = () => {
+    if (deleteId) {
+      deleteMutation.mutate(deleteId);
     }
   };
 
@@ -333,21 +427,18 @@ export default function ProductsPage() {
     return code;
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     const formDataToSend = new FormData();
 
-    // Add text fields
     formDataToSend.append("name", formData.name);
     formDataToSend.append("description", formData.description);
     formDataToSend.append("purity", formData.purity);
-
     formDataToSend.append(
       "code",
       formData.code ? formData.code : generateCode()
     );
-
     formDataToSend.append("price", formData.price);
     formDataToSend.append("discount_price", formData.discount_price);
     formDataToSend.append("stock", formData.stock);
@@ -366,7 +457,6 @@ export default function ProductsPage() {
     formDataToSend.append("isUpsell", formData.isUpsell);
     formDataToSend.append("isOnSale", formData.isOnSale);
 
-    // Add categories
     if (selectedCategory.length > 0) {
       selectedCategory.forEach((cat) =>
         formDataToSend.append("category[]", cat)
@@ -392,15 +482,17 @@ export default function ProductsPage() {
         formDataToSend.append("material[]", material)
       );
     }
-    // Add main image file
+    if (selectedSizes.length > 0) {
+      selectedSizes.forEach((size) => formDataToSend.append("sizes[]", size));
+    }
+
     if (formData.mainImage) {
       formDataToSend.append("image", formData.mainImage);
     }
 
-    // Add additional image files
-    formData.additionalImages?.forEach((file, index) => {
+    formData.additionalImages?.forEach((file) => {
       if (file) {
-        formDataToSend.append(`images`, file);
+        formDataToSend.append("images", file);
       }
     });
 
@@ -410,52 +502,9 @@ export default function ProductsPage() {
       });
     }
 
-    setBtnLoading(true);
-    try {
-      const url = editingProduct
-        ? `${API_BASE}api/admin/product/update/${editingProduct._id}`
-        : `${API_BASE}api/admin/product/create`;
-
-      const response = await fetch(url, {
-        method: editingProduct ? "PUT" : "POST",
-        headers: getAuthHeaders(),
-        body: formDataToSend,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.message ||
-          errorData.error ||
-          `Failed to ${editingProduct ? "update" : "create"} product`;
-        throw new Error(errorMessage);
-      }
-      console.log(response);
-
-      if (response._status) {
-        toast({
-          title: `Product ${
-            editingProduct ? "updated" : "created"
-          } successfully`,
-        });
-      }
-
-      closeDrawer();
-      loadProducts();
-    } catch (error) {
-      console.error("Error saving product:", error);
-      const errorMessage =
-        error.message ||
-        "An unexpected error occurred while saving the product";
-      toast({
-        title: "Error saving product",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setBtnLoading(false);
-    }
+    saveMutation.mutate({ formData: formDataToSend, editingProduct });
   };
+
   const closeDrawer = () => {
     setDrawerOpen(false);
     setEditingProduct(null);
@@ -464,7 +513,9 @@ export default function ProductsPage() {
     setSelectedSubSubCategory([]);
     setSelectedColors([]);
     setSelectedMaterials([]);
+    setSelectedSizes([]);
     setFormData(INITIAL_FORM_STATE);
+    setRemoveImagesUrl([]);
   };
 
   const handleMainImageChange = (e) => {
@@ -526,32 +577,20 @@ export default function ProductsPage() {
       additionalImagePreviews: newPreviews,
     });
   };
-  const router = useRouter();
 
   const showDetails = (item) => {
     router.push(`/dashboard/products/${item._id}`);
   };
 
-  const handleStatusChange = async (item) => {
-    setBtnLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/product/change-status/${item._id}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-        }
-      );
-      if (!response.ok) throw new Error("Failed to update status");
-      toast({
-        title: `${item.status ? "Deactivated" : "Activated"} successfully`,
-      });
-      loadProducts();
-    } catch (error) {
-      console.error("Error updating product status:", error);
-      toast({ title: "Error updating product status", variant: "destructive" });
-    } finally {
-      setBtnLoading(false);
+  const handleStatusChange = (item) => {
+    statusMutation.mutate(item._id);
+  };
+
+  const toggleRemoveImagesUrl = (url) => {
+    if (removeImagesUrl.includes(url)) {
+      setRemoveImagesUrl(removeImagesUrl.filter((u) => u !== url));
+    } else {
+      setRemoveImagesUrl([...removeImagesUrl, url]);
     }
   };
 
@@ -612,32 +651,36 @@ export default function ProductsPage() {
       label: "Status",
       render: (item) => (
         <Button
-          disabled={btnLoading}
+          disabled={statusMutation.isPending}
           variant={item.status ? "default" : "destructive"}
           className="font-mono cursor-pointer"
           onClick={() => handleStatusChange(item)}
         >
-          {btnLoading ? "Changing.." : item.status ? "Active" : "Inactive"}
+          {statusMutation.isPending
+            ? "Changing.."
+            : item.status
+            ? "Active"
+            : "Inactive"}
         </Button>
       ),
     },
   ];
 
-  const toggleRemoveImagesUrl = (url) => {
-    if (removeImagesUrl.includes(url)) {
-      setRemoveImagesUrl(removeImagesUrl.filter((u) => u !== url));
-    } else {
-      setRemoveImagesUrl([...removeImagesUrl, url]);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 bg-muted rounded"></div>
           <div className="h-96 bg-muted rounded-lg"></div>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-red-500">
+        Something went wrong while fetching products 😬
       </div>
     );
   }
@@ -683,7 +726,6 @@ export default function ProductsPage() {
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Basic Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* name */}
               <div className="space-y-2">
                 <Label htmlFor="name">Product Name *</Label>
                 <Input
@@ -696,7 +738,6 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              {/* price */}
               <div className="space-y-2">
                 <Label htmlFor="price">Price *</Label>
                 <Input
@@ -712,7 +753,6 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              {/* discount price */}
               <div className="space-y-2">
                 <Label htmlFor="discount_price">Discount Price *</Label>
                 <Input
@@ -720,10 +760,7 @@ export default function ProductsPage() {
                   id="discount_price"
                   value={formData.discount_price}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      discount_price: e.target.value,
-                    })
+                    setFormData({ ...formData, discount_price: e.target.value })
                   }
                   placeholder="Enter discount price"
                   min="0"
@@ -757,7 +794,6 @@ export default function ProductsPage() {
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Categories & Tags</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Category */}
               <div className="space-y-2">
                 <Label>Category *</Label>
                 <NewMultiSelect
@@ -767,7 +803,6 @@ export default function ProductsPage() {
                   placeholder="Select categories..."
                 />
               </div>
-              {/* Subcategory */}
               <div className="space-y-2">
                 <Label>Subcategory</Label>
                 <NewMultiSelect
@@ -778,7 +813,6 @@ export default function ProductsPage() {
                   disabled={selectedCategory.length === 0}
                 />
               </div>
-              {/* Sub-subcategory */}
               <div className="space-y-2">
                 <Label>Sub-subcategory</Label>
                 <NewMultiSelect
@@ -789,7 +823,6 @@ export default function ProductsPage() {
                   disabled={selectedSubCategory.length === 0}
                 />
               </div>
-              {/* Colors */}
               <div className="space-y-2">
                 <Label>Colors</Label>
                 <NewMultiSelect
@@ -799,7 +832,6 @@ export default function ProductsPage() {
                   placeholder="Select colors..."
                 />
               </div>
-              {/* Materials */}
               <div className="space-y-2">
                 <Label>Materials</Label>
                 <NewMultiSelect
@@ -809,6 +841,15 @@ export default function ProductsPage() {
                   placeholder="Select materials..."
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Sizes</Label>
+                <NewMultiSelect
+                  category={sizes}
+                  categoryId={selectedSizes}
+                  setCategoryId={setSelectedSizes}
+                  placeholder="Select sizes..."
+                />
+              </div>
             </div>
           </div>
 
@@ -816,7 +857,6 @@ export default function ProductsPage() {
           <div className="space-y-4">
             <h3 className="text-lg font-medium">Additional Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Purity */}
               <div className="space-y-2">
                 <Label htmlFor="purity">Purity *</Label>
                 <Input
@@ -829,7 +869,6 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              {/* Stock */}
               <div className="space-y-2">
                 <Label htmlFor="stock">Stock *</Label>
                 <Input
@@ -844,7 +883,6 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              {/* Estimated Delivery Time */}
               <div className="space-y-2">
                 <Label htmlFor="estimated_delivery_time">
                   Estimated Delivery Time *
@@ -862,7 +900,6 @@ export default function ProductsPage() {
                   required
                 />
               </div>
-              {/* Display Order */}
               <div className="space-y-2">
                 <Label htmlFor="order">Display Order</Label>
                 <Input
@@ -955,6 +992,7 @@ export default function ProductsPage() {
                 </div>
               )}
             </div>
+
             {/* Additional Images */}
             <div className="space-y-2">
               <Label>Additional Images</Label>
@@ -1008,6 +1046,7 @@ export default function ProductsPage() {
                       <input
                         type="text"
                         value={url}
+                        readOnly
                         className="flex-1 border border-gray-300 rounded px-2 py-1"
                       />
                       <button
@@ -1028,8 +1067,8 @@ export default function ProductsPage() {
             <Button type="button" variant="outline" onClick={closeDrawer}>
               Cancel
             </Button>
-            <Button disabled={btnLoading} type="submit">
-              {btnLoading
+            <Button disabled={saveMutation.isPending} type="submit">
+              {saveMutation.isPending
                 ? "Saving..."
                 : editingProduct
                 ? "Update Product"

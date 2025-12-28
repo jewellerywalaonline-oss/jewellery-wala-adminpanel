@@ -15,6 +15,7 @@ import {
   HelpCircle,
   Star,
   Palette,
+  Ruler,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -48,6 +49,7 @@ const menuItems = [
   { icon: HelpCircle, label: "FAQs", href: "/dashboard/faqs" },
   { icon: Star, label: "Why Choose Us", href: "/dashboard/why-choose-us" },
   { icon: Palette, label: "Materials & Colors", href: "/dashboard/materials" },
+  { icon: Ruler, label: "Sizes", href: "/dashboard/sizes" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 

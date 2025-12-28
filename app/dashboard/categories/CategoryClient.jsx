@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,10 +25,74 @@ const getAuthHeadersFormData = () => ({
   Authorization: `Bearer ${Cookies.get("adminToken")}`,
 });
 
+// API functions
+const fetchCategories = async () => {
+  const response = await fetch(`${API_BASE}api/admin/category/view`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({}),
+  });
+  if (!response.ok) throw new Error("Error loading categories");
+  const data = await response.json();
+  return data._data || data;
+};
+
+const createCategory = async (formData) => {
+  const response = await fetch(`${API_BASE}api/admin/category/create`, {
+    method: "POST",
+    headers: getAuthHeadersFormData(),
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(data._message || data.message || "Error creating category");
+  }
+  return data;
+};
+
+const updateCategory = async ({ id, formData }) => {
+  const response = await fetch(`${API_BASE}api/admin/category/update/${id}`, {
+    method: "PUT",
+    headers: getAuthHeadersFormData(),
+    body: formData,
+  });
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(data._message || data.message || "Error updating category");
+  }
+  return data;
+};
+
+const deleteCategory = async (id) => {
+  const response = await fetch(`${API_BASE}api/admin/category/delete/${id}`, {
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ id }),
+  });
+  const data = await response.json();
+  if (!response.ok && !data._status) {
+    throw new Error(data._message || "Error deleting category");
+  }
+  return data;
+};
+
+const changeCategoryStatus = async (id) => {
+  const response = await fetch(
+    `${API_BASE}api/admin/category/change-status/${id}`,
+    {
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ id }),
+    }
+  );
+  const data = await response.json();
+  if (!response.ok || data._status === false) {
+    throw new Error(data._message || "Error changing status");
+  }
+  return data;
+};
+
 export default function CategoriesClient({ initialCategories }) {
-  const [categories, setCategories] = useState(initialCategories);
-  const [loading, setLoading] = useState(false);
-  const [btnLoading, setBtnLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -38,28 +103,71 @@ export default function CategoriesClient({ initialCategories }) {
     image: null,
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadCategories = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`${API_BASE}api/admin/category/view`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({}),
-      });
+  // React Query hooks
+  const { data: categories = initialCategories, isLoading } = useQuery({
+    queryKey: ["categories"],
+    queryFn: fetchCategories,
+    initialData: initialCategories,
+    staleTime: 5 * 60 * 1000,
+  });
 
-      if (!response.ok) {
-        throw new Error("Error loading categories");
-      }
+  const createMutation = useMutation({
+    mutationFn: createCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast({ title: "Category created successfully" });
+      closeDrawer();
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
 
-      const data = await response.json();
-      setCategories(data._data || data);
-    } catch (error) {
-      console.error("Error loading categories:", error);
-      toast({ title: "Error loading categories", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+  const updateMutation = useMutation({
+    mutationFn: updateCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast({ title: "Category updated successfully" });
+      closeDrawer();
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteCategory,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast({ title: "Category deleted successfully" });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: changeCategoryStatus,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+      toast({ title: "Category status updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditingCategory(null);
+    setFormData({ name: "", image: null });
+    setImagePreview(null);
   };
 
   const handleEdit = (category) => {
@@ -72,44 +180,14 @@ export default function CategoriesClient({ initialCategories }) {
     setDrawerOpen(true);
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     setCategoryToDelete(id);
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
-    if (!categoryToDelete) return;
-
-    setBtnLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/category/delete/${categoryToDelete}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: categoryToDelete }),
-        }
-      );
-
-      const data = await response.json();
-
-      // Check for success in response
-      if (!response.ok && !data._status) {
-        throw new Error(data._message || "Error deleting category");
-      }
-
-      toast({ title: "Category deleted successfully" });
-      await loadCategories(); // Reload categories after delete
-    } catch (error) {
-      console.error("Error deleting category:", error);
-      toast({ 
-        title: error.message || "Error deleting category", 
-        variant: "destructive" 
-      });
-    } finally {
-      setBtnLoading(false);
-      setDeleteDialogOpen(false);
-      setCategoryToDelete(null);
+  const confirmDelete = () => {
+    if (categoryToDelete) {
+      deleteMutation.mutate(categoryToDelete);
     }
   };
 
@@ -125,110 +203,38 @@ export default function CategoriesClient({ initialCategories }) {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
 
     if (!formData.name.trim()) {
-      toast({ 
-        title: "Category name is required", 
-        variant: "destructive" 
-      });
+      toast({ title: "Category name is required", variant: "destructive" });
       return;
     }
 
-    setBtnLoading(true);
-    try {
-      const submitData = new FormData();
-      submitData.append("name", formData.name);
-      if (formData.image instanceof File) {
-        submitData.append("image", formData.image);
-      }
+    const submitData = new FormData();
+    submitData.append("name", formData.name);
+    if (formData.image instanceof File) {
+      submitData.append("image", formData.image);
+    }
 
-      let response;
-      
-      if (editingCategory) {
-        response = await fetch(
-          `${API_BASE}api/admin/category/update/${editingCategory._id}`,
-          {
-            method: "PUT",
-            headers: getAuthHeadersFormData(),
-            body: submitData,
-          }
-        );
-      } else {
-        response = await fetch(`${API_BASE}api/admin/category/create`, {
-          method: "POST",
-          headers: getAuthHeadersFormData(),
-          body: submitData,
-        });
-      }
-
-      // Parse response
-      const data = await response.json();
-
-      // Check for success - handle both response.ok and data._status
-      if (!response.ok || data._status === false) {
-        throw new Error(data._message || data.message || "Error saving category");
-      }
-
-      toast({ 
-        title: editingCategory 
-          ? "Category updated successfully" 
-          : "Category created successfully" 
-      });
-      
-      setDrawerOpen(false);
-      setEditingCategory(null);
-      setFormData({ name: "", image: null });
-      setImagePreview(null);
-      
-      // Reload categories after successful operation
-      await loadCategories();
-    } catch (error) {
-      console.error("Error saving category:", error);
-      toast({
-        title: error.message || "Error saving category",
-        variant: "destructive",
-      });
-    } finally {
-      setBtnLoading(false);
+    if (editingCategory) {
+      updateMutation.mutate({ id: editingCategory._id, formData: submitData });
+    } else {
+      createMutation.mutate(submitData);
     }
   };
 
-  const handleChangeStatus = async (category) => {
-    setBtnLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE}api/admin/category/change-status/${category._id}`,
-        {
-          method: "PUT",
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ id: category._id }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok || data._status === false) {
-        throw new Error(data._message || "Error changing status");
-      }
-
-      toast({ 
-        title: `Category ${category.status ? 'deactivated' : 'activated'} successfully` 
-      });
-      await loadCategories(); // Reload categories after status change
-    } catch (error) {
-      console.error("Error changing status:", error);
-      toast({ 
-        title: error.message || "Error changing status", 
-        variant: "destructive" 
-      });
-    } finally {
-      setBtnLoading(false);
-    }
+  const handleChangeStatus = (category) => {
+    statusMutation.mutate(category._id);
   };
 
-  if (loading) {
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    statusMutation.isPending;
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
@@ -262,7 +268,7 @@ export default function CategoriesClient({ initialCategories }) {
               setDrawerOpen(true);
             }}
             className="transition-all duration-200 hover:scale-105"
-            disabled={btnLoading}
+            disabled={isPending}
           >
             <Plus className="h-4 w-4 mr-2" />
             Add Category
@@ -340,7 +346,7 @@ export default function CategoriesClient({ initialCategories }) {
                         size="sm"
                         onClick={() => handleEdit(category)}
                         className="flex-1 transition-all duration-200 hover:scale-105"
-                        disabled={btnLoading}
+                        disabled={isPending}
                       >
                         <Edit className="h-3 w-3 mr-2" />
                         Edit
@@ -350,7 +356,7 @@ export default function CategoriesClient({ initialCategories }) {
                         size="sm"
                         onClick={() => handleDelete(category._id)}
                         className="flex-1 transition-all duration-200 hover:scale-105 text-destructive hover:text-destructive"
-                        disabled={btnLoading}
+                        disabled={isPending}
                       >
                         <Trash2 className="h-3 w-3 mr-2" />
                         Delete
@@ -361,9 +367,9 @@ export default function CategoriesClient({ initialCategories }) {
                       size="sm"
                       onClick={() => handleChangeStatus(category)}
                       className="w-full transition-all duration-200"
-                      disabled={btnLoading}
+                      disabled={isPending}
                     >
-                      {btnLoading ? (
+                      {statusMutation.isPending ? (
                         <Loader2 className="h-3 w-3 mr-2 animate-spin" />
                       ) : null}
                       {category.status ? "Deactivate" : "Activate"}
@@ -379,12 +385,7 @@ export default function CategoriesClient({ initialCategories }) {
       <Drawer
         isOpen={drawerOpen}
         onClose={() => {
-          if (!btnLoading) {
-            setDrawerOpen(false);
-            setEditingCategory(null);
-            setFormData({ name: "", image: null });
-            setImagePreview(null);
-          }
+          if (!isPending) closeDrawer();
         }}
         title={editingCategory ? "Edit Category" : "Add Category"}
       >
@@ -397,7 +398,7 @@ export default function CategoriesClient({ initialCategories }) {
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
-              disabled={btnLoading}
+              disabled={isPending}
               placeholder="Enter category name"
             />
           </div>
@@ -409,7 +410,7 @@ export default function CategoriesClient({ initialCategories }) {
               type="file"
               accept="image/*"
               onChange={handleImageChange}
-              disabled={btnLoading}
+              disabled={isPending}
             />
             {imagePreview && (
               <div className="relative w-full h-40 rounded-lg overflow-hidden border border-muted mt-2">
@@ -427,7 +428,7 @@ export default function CategoriesClient({ initialCategories }) {
                     setFormData({ ...formData, image: null });
                   }}
                   className="absolute top-2 right-2 rounded-full h-6 w-6 p-0"
-                  disabled={btnLoading}
+                  disabled={isPending}
                 >
                   ✕
                 </Button>
@@ -438,9 +439,9 @@ export default function CategoriesClient({ initialCategories }) {
           <Button
             onClick={handleSubmit}
             className="w-full animate-in slide-in-from-bottom duration-300 delay-150"
-            disabled={btnLoading}
+            disabled={isPending}
           >
-            {btnLoading ? (
+            {createMutation.isPending || updateMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 {editingCategory ? "Updating..." : "Creating..."}
@@ -455,7 +456,7 @@ export default function CategoriesClient({ initialCategories }) {
       <AlertDialogUse
         isOpen={deleteDialogOpen}
         onClose={() => {
-          if (!btnLoading) {
+          if (!deleteMutation.isPending) {
             setDeleteDialogOpen(false);
             setCategoryToDelete(null);
           }
@@ -463,8 +464,8 @@ export default function CategoriesClient({ initialCategories }) {
         onConfirm={confirmDelete}
         title="Delete Category"
         description="Are you sure you want to delete this category? This action cannot be undone."
-        confirmText={btnLoading ? "Deleting..." : "Delete"}
-        confirmDisabled={btnLoading}
+        confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
+        confirmDisabled={deleteMutation.isPending}
       />
     </div>
   );

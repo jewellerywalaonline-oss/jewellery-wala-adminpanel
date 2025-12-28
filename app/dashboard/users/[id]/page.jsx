@@ -73,6 +73,10 @@ export default function page() {
               <span className="font-medium text-gray-800">{_user.email}</span>
             </p>
             <p className="text-gray-600">
+              Phone:{" "}
+              <span className="font-medium text-gray-800">{_user.mobile}</span>
+            </p>
+            <p className="text-gray-600">
               Role:{" "}
               <span className="font-medium text-gray-800 capitalize">
                 {_user.role}

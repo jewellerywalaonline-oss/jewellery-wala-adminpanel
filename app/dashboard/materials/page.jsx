@@ -1,20 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Drawer } from "@/components/drawer";
 import { ExportButtons } from "@/components/export-buttons";
 import { AlertDialogUse } from "@/components/alert-dialog";
@@ -23,10 +16,121 @@ import { useToast } from "@/hooks/use-toast";
 import axios from "axios";
 import Cookies from "js-cookie";
 
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  Authorization: `Bearer ${Cookies.get("adminToken")}`,
+});
+
+// API functions
+const fetchMaterials = async () => {
+  const response = await axios.post(
+    `${API_BASE}api/admin/material/view`,
+    {},
+    { headers: getAuthHeaders() }
+  );
+  return response.data._data || [];
+};
+
+const fetchColors = async () => {
+  const response = await axios.post(
+    `${API_BASE}api/admin/color/view`,
+    {},
+    { headers: getAuthHeaders() }
+  );
+  return response.data._data || [];
+};
+
+const createMaterial = async (data) => {
+  const response = await axios.post(
+    `${API_BASE}api/admin/material/create`,
+    data,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error creating material");
+  }
+  return response.data;
+};
+
+const updateMaterial = async ({ id, data }) => {
+  const response = await axios.put(
+    `${API_BASE}api/admin/material/update/${id}`,
+    data,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error updating material");
+  }
+  return response.data;
+};
+
+const deleteMaterial = async (id) => {
+  const response = await axios.put(
+    `${API_BASE}api/admin/material/destroy`,
+    { id },
+    { headers: getAuthHeaders() }
+  );
+  return response.data;
+};
+
+const changeMaterialStatus = async (id) => {
+  const response = await axios.post(
+    `${API_BASE}api/admin/material/change-status`,
+    { id },
+    { headers: getAuthHeaders() }
+  );
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error updating material status");
+  }
+  return response.data;
+};
+
+const createColor = async (data) => {
+  const response = await axios.post(`${API_BASE}api/admin/color/create`, data, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error creating color");
+  }
+  return response.data;
+};
+
+const updateColor = async ({ id, data }) => {
+  const response = await axios.put(
+    `${API_BASE}api/admin/color/update/${id}`,
+    data,
+    { headers: getAuthHeaders() }
+  );
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error updating color");
+  }
+  return response.data;
+};
+
+const deleteColor = async (id) => {
+  const response = await axios.put(
+    `${API_BASE}api/admin/color/destroy`,
+    { id },
+    { headers: getAuthHeaders() }
+  );
+  return response.data;
+};
+
+const changeColorStatus = async (id) => {
+  const response = await axios.post(
+    `${API_BASE}api/admin/color/change-status`,
+    { id },
+    { headers: getAuthHeaders() }
+  );
+  if (!response.data._status) {
+    throw new Error(response.data._message || "Error updating color status");
+  }
+  return response.data;
+};
+
 export default function MaterialsColorsPage() {
-  const [materials, setMaterials] = useState([]);
-  const [colors, setColors] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState("material");
   const [editingItem, setEditingItem] = useState(null);
@@ -43,49 +147,132 @@ export default function MaterialsColorsPage() {
     order: 0,
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL;
-  const getAuthHeaders = () => ({
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${Cookies.get("adminToken")}`,
+  // React Query hooks for fetching
+  const { data: materials = [], isLoading: materialsLoading } = useQuery({
+    queryKey: ["materials"],
+    queryFn: fetchMaterials,
+    staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const { data: colors = [], isLoading: colorsLoading } = useQuery({
+    queryKey: ["colors"],
+    queryFn: fetchColors,
+    staleTime: 5 * 60 * 1000,
+  });
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [materialsResponse, colorsResponse] = await Promise.all([
-        axios.post(
-          `${API_BASE}api/admin/material/view`,
-          {},
-          {
-            headers: getAuthHeaders(),
-          }
-        ),
-        axios.post(
-          `${API_BASE}api/admin/color/view`,
-          {},
-          {
-            headers: getAuthHeaders(),
-          }
-        ),
-      ]);
-      setMaterials(materialsResponse.data._data || []);
-      setColors(colorsResponse.data._data || []);
-      
-    } catch (error) {
+  // Material mutations
+  const createMaterialMutation = useMutation({
+    mutationFn: createMaterial,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      toast({ title: "Material created successfully" });
+      setDrawerOpen(false);
+      setMaterialForm({ name: "", order: 0 });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMaterialMutation = useMutation({
+    mutationFn: updateMaterial,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      toast({ title: "Material updated successfully" });
+      setDrawerOpen(false);
+      setEditingItem(null);
+      setMaterialForm({ name: "", order: 0 });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMaterialMutation = useMutation({
+    mutationFn: deleteMaterial,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      toast({ title: "Material deleted successfully" });
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    },
+    onError: (error) => {
       toast({
-        title: "Error loading data",
-        description: error.response?.data?._message || "Failed to load data",
+        title: "Error deleting material",
+        description: error.response?.data?._message || "Failed to delete",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
+
+  const materialStatusMutation = useMutation({
+    mutationFn: changeMaterialStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      toast({ title: "Material status updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  // Color mutations
+  const createColorMutation = useMutation({
+    mutationFn: createColor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["colors"] });
+      toast({ title: "Color created successfully" });
+      setDrawerOpen(false);
+      setColorForm({ name: "", code: "#000000", order: 0 });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateColorMutation = useMutation({
+    mutationFn: updateColor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["colors"] });
+      toast({ title: "Color updated successfully" });
+      setDrawerOpen(false);
+      setEditingItem(null);
+      setColorForm({ name: "", code: "#000000", order: 0 });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteColorMutation = useMutation({
+    mutationFn: deleteColor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["colors"] });
+      toast({ title: "Color deleted successfully" });
+      setDeleteDialogOpen(false);
+      setItemToDelete(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error deleting color",
+        description: error.response?.data?._message || "Failed to delete",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const colorStatusMutation = useMutation({
+    mutationFn: changeColorStatus,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["colors"] });
+      toast({ title: "Color status updated successfully" });
+    },
+    onError: (error) => {
+      toast({ title: error.message, variant: "destructive" });
+    },
+  });
 
   const handleEditMaterial = (material) => {
     setEditingItem(material);
@@ -107,216 +294,63 @@ export default function MaterialsColorsPage() {
     setDrawerType("color");
     setDrawerOpen(true);
   };
-  console.log(colorForm);
-  
-  const handleDeleteMaterial = async (id) => {
+
+  const handleDeleteMaterial = (id) => {
     setItemToDelete(id);
     setDeleteType("material");
     setDeleteDialogOpen(true);
   };
 
-  const handleDeleteColor = async (id) => {
+  const handleDeleteColor = (id) => {
     setItemToDelete(id);
     setDeleteType("color");
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = () => {
     if (!itemToDelete) return;
-
-    try {
-      if (deleteType === "material") {
-        await axios.put(
-          `${API_BASE}api/admin/material/destroy`,
-          { id: itemToDelete },
-          { headers: getAuthHeaders() }
-        );
-        setMaterials(materials.filter((m) => m._id !== itemToDelete));
-        toast({ title: "Material deleted successfully" });
-      } else {
-        await axios.put(
-          `${API_BASE}api/admin/color/destroy`,
-          { id: itemToDelete },
-          { headers: getAuthHeaders() }
-        );
-        setColors(colors.filter((c) => c._id !== itemToDelete));
-        toast({ title: "Color deleted successfully" });
-      }
-    } catch (error) {
-      toast({
-        title: `Error deleting ${deleteType}`,
-        description: error.response?.data?._message || "Failed to delete",
-        variant: "destructive",
-      });
-    } finally {
-      setDeleteDialogOpen(false);
-      setItemToDelete(null);
+    if (deleteType === "material") {
+      deleteMaterialMutation.mutate(itemToDelete);
+    } else {
+      deleteColorMutation.mutate(itemToDelete);
     }
   };
 
-  const handleSubmitMaterial = async (e) => {
+  const handleSubmitMaterial = (e) => {
     e.preventDefault();
-
-    try {
-      if (editingItem) {
-        const response = await axios.put(
-          `${API_BASE}api/admin/material/update/${editingItem._id}`,
-          materialForm,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.data._status) {
-          toast({ title: "Material updated successfully" });
-        } else {
-          toast({
-            title: response.data._message || "Error updating material",
-            variant: "destructive",
-          });
-          return;
-        }
-      } else {
-        const response = await axios.post(
-          `${API_BASE}api/admin/material/create`,
-          materialForm,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.data._status) {
-          toast({ title: "Material created successfully" });
-        } else {
-          toast({
-            title: response.data._message || "Error creating material",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      setDrawerOpen(false);
-      setEditingItem(null);
-      setMaterialForm({ name: "", order: 0 });
-    } catch (error) {
-      toast({
-        title: `Error ${editingItem ? "updating" : "creating"} material`,
-        description: error.response?.data?._message || "Operation failed",
-        variant: "destructive",
+    if (editingItem) {
+      updateMaterialMutation.mutate({
+        id: editingItem._id,
+        data: materialForm,
       });
+    } else {
+      createMaterialMutation.mutate(materialForm);
     }
   };
 
-  const handleSubmitColor = async (e) => {
+  const handleSubmitColor = (e) => {
     e.preventDefault();
-
-    try {
-      if (editingItem) {
-        const data = {
-          name : colorForm.name,
-          code : colorForm.code,
-          order : colorForm.order
-        }
-        const response = await axios.put(
-          `${API_BASE}api/admin/color/update/${editingItem._id}`,
-          data,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.data._status) {
-          
-        
-          toast({ title: "Color updated successfully" });
-        } else {
-          toast({
-            title: response.data._message || "Error updating color",
-            variant: "destructive",
-          });
-          return;
-        }
-      } else {
-        const data = {
-          name : colorForm.name,
-          code : colorForm.code,
-          order : colorForm.order
-        }
-        const response = await axios.post(
-          `${API_BASE}api/admin/color/create`,
-          data,
-          { headers: getAuthHeaders() }
-        );
-
-        if (response.data._status) {
-          toast({ title: "Color created successfully" });
-        } else {
-          toast({
-            title: response.data._message || "Error creating color",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      setDrawerOpen(false);
-      setEditingItem(null);
-      setColorForm({ name: "", code: "#000000", order: 0 });
-    } catch (error) {
-      toast({
-        title: `Error ${editingItem ? "updating" : "creating"} color`,
-        description: error.response?.data?._message || "Operation failed",
-        variant: "destructive",
-      });
+    const data = {
+      name: colorForm.name,
+      code: colorForm.code,
+      order: colorForm.order,
+    };
+    if (editingItem) {
+      updateColorMutation.mutate({ id: editingItem._id, data });
+    } else {
+      createColorMutation.mutate(data);
     }
   };
 
-  const handleEditColorStatus = async (color) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE}api/admin/color/change-status`,
-        { id: color._id  },
-        { headers: getAuthHeaders() }
-      );
-
-      if (response.data._status) {
-        toast({ title: "Color status updated successfully" });
-      } else {
-        toast({
-          title: response.data._message || "Error updating color status",
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
-      toast({
-        title: "Error updating color status",
-        description: error.response?.data?._message || "Operation failed",
-        variant: "destructive",
-      });
-    }
+  const handleEditMaterialStatus = (material) => {
+    materialStatusMutation.mutate(material._id);
   };
 
-  const handleEditMaterialStatus = async (material) => {
-    try {
-      const response = await axios.post(
-        `${API_BASE}api/admin/material/change-status`,
-        { id: material._id  },
-        { headers: getAuthHeaders() }
-      );
-
-      if (response.data._status) {
-        toast({ title: "Material status updated successfully" });
-      } else {
-        toast({
-          title: response.data._message || "Error updating material status",
-          variant: "destructive",
-        });
-        return;
-      }
-    } catch (error) {
-      toast({
-        title: "Error updating material status",
-        description: error.response?.data?._message || "Operation failed",
-        variant: "destructive",
-      });
-    }
+  const handleEditColorStatus = (color) => {
+    colorStatusMutation.mutate(color._id);
   };
+
+  const loading = materialsLoading || colorsLoading;
 
   if (loading) {
     return (
@@ -396,11 +430,7 @@ export default function MaterialsColorsPage() {
                         </p>
                       </div>
                     </div>
-                    <Badge
-                      variant={
-                        material.status ? "default" : "secondary"
-                      }
-                    >
+                    <Badge variant={material.status ? "default" : "secondary"}>
                       {material.status ? "Active" : "Inactive"}
                     </Badge>
                   </div>
@@ -487,9 +517,7 @@ export default function MaterialsColorsPage() {
                     </p>
                     {color.status && (
                       <Badge
-                        variant={
-                          color.status ? "default" : "secondary"
-                        }
+                        variant={color.status ? "default" : "secondary"}
                         className="text-xs"
                       >
                         {color.status ? "Active" : "Inactive"}
@@ -578,8 +606,17 @@ export default function MaterialsColorsPage() {
             <Button
               type="submit"
               className="w-full animate-in slide-in-from-bottom duration-300 delay-100"
+              disabled={
+                createMaterialMutation.isPending ||
+                updateMaterialMutation.isPending
+              }
             >
-              {editingItem ? "Update Material" : "Create Material"}
+              {createMaterialMutation.isPending ||
+              updateMaterialMutation.isPending
+                ? "Saving..."
+                : editingItem
+                ? "Update Material"
+                : "Create Material"}
             </Button>
           </form>
         ) : (
@@ -636,15 +673,20 @@ export default function MaterialsColorsPage() {
                 }
                 required
               />
-
             </div>
-            
 
             <Button
               type="submit"
               className="w-full animate-in slide-in-from-bottom duration-300 delay-125"
+              disabled={
+                createColorMutation.isPending || updateColorMutation.isPending
+              }
             >
-              {editingItem ? "Update Color" : "Create Color"}
+              {createColorMutation.isPending || updateColorMutation.isPending
+                ? "Saving..."
+                : editingItem
+                ? "Update Color"
+                : "Create Color"}
             </Button>
           </form>
         )}
