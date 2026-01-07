@@ -99,6 +99,38 @@ export default function Orders() {
     }
   };
 
+  const handleMarkToDelivered = async (order) => {
+    try {
+      const token = Cookies.get("adminToken");
+      const { data } = await axios.post(
+        process.env.NEXT_PUBLIC_BACKEND_URL + "api/admin/orders/deliever/order",
+        { orderId: order.orderId },
+        {
+          headers: {
+            authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (data.success) {
+        toast({
+          title: "Success",
+          description: data.message || "Order marked to delivered successfully",
+        });
+        loadOrders();
+        setDrawerOpen(false);
+      }
+    } catch (error) {
+      console.log(error);
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "Failed to mark order to delivered",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handlePrint = (order) => {
     setSelectedOrder(order);
     setReceiptOpen(true);
@@ -334,8 +366,8 @@ export default function Orders() {
       >
         <form onSubmit={confirmCancelOrder} className="space-y-4 p-4">
           <div className="space-y-2">
-            <label 
-              htmlFor="reason" 
+            <label
+              htmlFor="reason"
               className="block text-sm font-medium text-gray-700"
             >
               Reason for Cancellation
@@ -365,11 +397,7 @@ export default function Orders() {
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              variant="destructive"
-              className="px-6 py-2"
-            >
+            <Button type="submit" variant="destructive" className="px-6 py-2">
               Confirm Cancellation
             </Button>
           </div>
@@ -409,6 +437,17 @@ export default function Orders() {
             Cancel This Order
           </Button>
         )}
+        {selectedOrder?.status === "shipped" && (
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => handleMarkToDelivered(selectedOrder)}
+            className="transition-all duration-200 hover:scale-105 w-full mt-4"
+          >
+            <CheckCircle className="h-4 w-4 mr-2" />
+            Mark To Delivered
+          </Button>
+        )}
 
         {/* order details */}
         {selectedOrder && (
@@ -425,6 +464,12 @@ export default function Orders() {
                 <p className="font-medium">Customer:</p>
                 <p className="text-muted-foreground">
                   {selectedOrder?.shippingAddress?.fullName}
+                </p>
+                <p className="text-muted-foreground">
+                  {selectedOrder?.shippingAddress?.email}
+                </p>
+                <p className="text-muted-foreground">
+                  {selectedOrder?.shippingAddress?.phone}
                 </p>
               </div>
               <div className="border-t pt-2">
