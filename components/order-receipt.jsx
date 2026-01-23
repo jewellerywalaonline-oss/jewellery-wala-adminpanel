@@ -1,16 +1,9 @@
 "use client";
-
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   X,
   Printer,
   Package,
-  CreditCard,
-  User,
-  MapPin,
-  Calendar,
-  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -48,7 +41,7 @@ export function OrderReceipt({ isOpen, onClose, order }) {
   //     document.body.style.overflow = "unset";
   //   };
   // }, [isOpen]);
-
+  console.log(order);
   const handlePrint = () => {
     const originalTitle = document.title;
     document.title = `Invoice-${order.orderId}`;
@@ -231,6 +224,13 @@ export function OrderReceipt({ isOpen, onClose, order }) {
                                   Color: {item.colorId.name}
                                 </p>
                               )}
+                              {
+                                item.sizeId && (
+                                  <p className="text-xs text-gray-600">
+                                    Size: {item.sizeId.name}
+                                  </p>
+                                )
+                              }
                             {item.isPersonalized && item.personalizedName && (
                               <p className="text-xs text-gray-600">
                                 Personalized: {item.personalizedName}
