@@ -4,13 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { StatCard } from "@/components/stat-card";
 import { RecentActivity } from "@/components/recent-activity";
 import { RecentOrders } from "@/components/recent-orders";
-import {
-  ShoppingCart,
-  Users,
-  Package,
-  IndianRupee,
-} from "lucide-react";
+import { ShoppingCart, Users, Package, IndianRupee } from "lucide-react";
 import RefundedOrdersAdmin from "@/components/RefundedOrdersAdmin";
+import PendingPaymentFix from "@/components/PendingPaymentFix";
 import Cookies from "js-cookie";
 
 export default function DashboardPage() {
@@ -26,7 +22,7 @@ export default function DashboardPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
     if (!res.ok) throw new Error("Failed to fetch dashboard stats");
     const data = await res.json();
@@ -42,7 +38,7 @@ export default function DashboardPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      }
+      },
     );
     if (!res.ok) throw new Error("Failed to fetch activity");
     const data = await res.json();
@@ -162,6 +158,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      {/* pending payment fix */}
+      <PendingPaymentFix />
 
       {/* refunded orders */}
       <div className="">
